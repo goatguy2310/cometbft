@@ -14,11 +14,7 @@ import (
 // -----------------------------------------------------
 // Validate block
 
-const (
-	NStates = 2
-)
-
-func validateBlock(state State, block *types.Block) error {
+func validateBlock(state State, block *types.Block, NStates int) error {
 	// Validate internal consistency.
 	if err := block.ValidateBasic(); err != nil {
 		return err
@@ -38,11 +34,11 @@ func validateBlock(state State, block *types.Block) error {
 			block.ChainID,
 		)
 	}
-	if state.LastBlockHeight == 0 && (block.Height < state.InitialHeight || block.Height >= state.InitialHeight+NStates) {
+	if state.LastBlockHeight == 0 && (block.Height < state.InitialHeight || block.Height >= state.InitialHeight+int64(NStates)) {
 		return fmt.Errorf("wrong Block.Header.Height. Expected %v for initial block, got %v",
 			state.InitialHeight, block.Height)
 	}
-	if state.LastBlockHeight > 0 && (block.Height < state.LastBlockHeight+1 || block.Height >= state.LastBlockHeight+1+NStates) {
+	if state.LastBlockHeight > 0 && (block.Height < state.LastBlockHeight+1 || block.Height >= state.LastBlockHeight+1+int64(NStates)) {
 		return fmt.Errorf("wrong Block.Header.Height. Expected %v, got %v",
 			state.LastBlockHeight+1,
 			block.Height,
@@ -89,14 +85,14 @@ func validateBlock(state State, block *types.Block) error {
 	}
 
 	// Validate block LastCommit.
-	if block.Height >= state.InitialHeight && block.Height < state.InitialHeight+NStates {
+	if block.Height >= state.InitialHeight && block.Height < state.InitialHeight+int64(NStates) {
 		if len(block.LastCommit.Signatures) != 0 {
 			return errors.New("initial block can't have LastCommit signatures")
 		}
 	} else {
 		// LastCommit.Signatures length is checked in VerifyCommit.
 		if err := state.LastValidators.VerifyCommit(
-			state.ChainID, state.LastBlockID, block.Height-NStates, block.LastCommit); err != nil {
+			state.ChainID, state.LastBlockID, block.Height-int64(NStates), block.LastCommit); err != nil {
 			return err
 		}
 	}
@@ -122,7 +118,7 @@ func validateBlock(state State, block *types.Block) error {
 	}
 
 	switch {
-	case block.Height >= state.InitialHeight+NStates:
+	case block.Height >= state.InitialHeight+int64(NStates):
 		if !block.Time.After(state.LastBlockTime) {
 			return fmt.Errorf("block time %v not greater than last block time %v",
 				block.Time,

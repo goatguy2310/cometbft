@@ -39,10 +39,12 @@ var msgQueueSize = 1000
 type Barrier struct {
 	waitCond int64
 	cond     *sync.Cond
+
+	NStates int64
 }
 
-func NewBarrier() *Barrier {
-	return &Barrier{waitCond: 0, cond: sync.NewCond(&sync.Mutex{})}
+func NewBarrier(NStates int) *Barrier {
+	return &Barrier{waitCond: 0, cond: sync.NewCond(&sync.Mutex{}), NStates: int64(NStates)}
 }
 
 func (b *Barrier) Wait(ctx int64) {
@@ -54,7 +56,7 @@ func (b *Barrier) Wait(ctx int64) {
 
 func (b *Barrier) Unlock(ctx int64) {
 	b.waitCond++
-	if b.waitCond == NStates {
+	if b.waitCond == b.NStates {
 		b.waitCond = 0
 	}
 	b.cond.Broadcast()
@@ -68,15 +70,18 @@ type CommutativityBarrier struct {
 	blockExec   *sm.BlockExecutor
 	blocks      [][][]byte
 	commutative bool
+
+	NStates int64
 }
 
-func NewCommutativityBarrier(blockExec *sm.BlockExecutor) *CommutativityBarrier {
+func NewCommutativityBarrier(blockExec *sm.BlockExecutor, NStates int) *CommutativityBarrier {
 	return &CommutativityBarrier{
 		waitCond:    0,
 		cond:        sync.NewCond(&sync.Mutex{}),
 		blockExec:   blockExec,
-		blocks:      make([][][]byte, NStates),
+		blocks:      make([][][]byte, int64(NStates)),
 		commutative: false,
+		NStates:     int64(NStates),
 	}
 }
 
@@ -87,7 +92,7 @@ func (b *CommutativityBarrier) Wait(idx int64, block [][]byte) bool {
 	b.blocks[idx] = block
 	b.waitCond++
 
-	if b.waitCond == NStates {
+	if b.waitCond == b.NStates {
 		// res, err := b.blockExec.CheckBlocksCommute(b.blocks)
 		res := true // DEBUG: set to always commute for testing
 		b.commutative = res
@@ -219,6 +224,8 @@ type State struct {
 
 	// commutativity barrier
 	CommutativityBarrier *CommutativityBarrier
+
+	NStates int
 }
 
 // StateOption sets an optional parameter on the State.
@@ -249,6 +256,7 @@ func NewState(
 		evpool:           evpool,
 		evsw:             cmtevents.NewEventSwitch(),
 		metrics:          NopMetrics(),
+		NStates:          config.NStates,
 	}
 	for _, option := range options {
 		option(cs)
@@ -796,8 +804,8 @@ func (cs *State) updateToState(state sm.State) {
 	}
 
 	// Next desired block height
-	height := state.LastBlockHeight + NStates
-	if height == NStates {
+	height := state.LastBlockHeight + int64(cs.NStates)
+	if height == int64(cs.NStates) {
 		height = int64(cs.Idx + 1)
 	}
 
@@ -1974,9 +1982,9 @@ func (cs *State) finalizeCommit(height int64) {
 		// but may differ from the LastCommit included in the next block
 		seenExtendedCommit := cs.Votes.Precommits(cs.CommitRound).MakeExtendedCommit(cs.state.ConsensusParams.Feature)
 		if cs.state.ConsensusParams.Feature.VoteExtensionsEnabled(block.Height) {
-			cs.blockStore.SaveBlockWithExtendedCommit(block, blockParts, seenExtendedCommit)
+			cs.blockStore.SaveBlockWithExtendedCommit(block, blockParts, seenExtendedCommit, cs.NStates)
 		} else {
-			cs.blockStore.SaveBlock(block, blockParts, seenExtendedCommit.ToCommit())
+			cs.blockStore.SaveBlock(block, blockParts, seenExtendedCommit.ToCommit(), cs.NStates)
 			logger.Info("Saved block to blockstore ", "height", block.Height)
 		}
 	} else {
@@ -2074,7 +2082,7 @@ func (cs *State) recordMetrics(height int64, block *types.Block) {
 	// height=0 -> MissingValidators and MissingValidatorsPower are both 0.
 	// Remember that the first LastCommit is intentionally empty, so it's not
 	// fair to increment missing validators number.
-	if height >= cs.state.InitialHeight+NStates {
+	if height >= cs.state.InitialHeight+int64(cs.NStates) {
 		// Sanity check that commit size matches validator set size - only applies
 		// after first block.
 		var (

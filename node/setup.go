@@ -41,8 +41,6 @@ import (
 
 const (
 	readHeaderTimeout = 10 * time.Second
-
-	NStates = 2
 )
 
 // ChecksummedGenesisDoc combines a GenesisDoc together with its
@@ -200,8 +198,9 @@ func doHandshake(
 	eventBus types.BlockEventPublisher,
 	proxyApp proxy.AppConns,
 	consensusLogger log.Logger,
+	NStates int,
 ) error {
-	handshaker := cs.NewHandshaker(stateStore, state, blockStore, genDoc)
+	handshaker := cs.NewHandshaker(stateStore, state, blockStore, genDoc, NStates)
 	handshaker.SetLogger(consensusLogger)
 	handshaker.SetEventBus(eventBus)
 	if err := handshaker.Handshake(ctx, proxyApp); err != nil {
@@ -316,7 +315,7 @@ func createBlocksyncReactor(config *cfg.Config,
 ) (bcReactor p2p.Reactor, err error) {
 	switch config.BlockSync.Version {
 	case "v0":
-		bcReactor = blocksync.NewReactor(state.Copy(), blockExec, blockStore, blockSync, localAddr, metrics, offlineStateSyncHeight)
+		bcReactor = blocksync.NewReactor(state.Copy(), blockExec, blockStore, blockSync, localAddr, metrics, offlineStateSyncHeight, config.Consensus.NStates)
 	case "v1", "v2":
 		return nil, fmt.Errorf("block sync version %s has been deprecated. Please use v0", config.BlockSync.Version)
 	default:
@@ -340,8 +339,8 @@ func createConsensusReactor(config *cfg.Config,
 	consensusLogger log.Logger,
 	offlineStateSyncHeight int64,
 ) (*cs.Reactor, *cs.State) {
-	var consensusStates = [NStates]*cs.State{}
-	for i := 0; i < NStates; i++ {
+	var consensusStates = make([]*cs.State, config.Consensus.NStates)
+	for i := 0; i < config.Consensus.NStates; i++ {
 		consensusStates[i] = cs.NewState(
 			config.Consensus,
 			&state,
@@ -361,7 +360,7 @@ func createConsensusReactor(config *cfg.Config,
 			consensusStates[i].SetPrivValidator(privval.LoadOrGenFilePV(config.PrivValidatorKeyFile(), config.PrivValidatorStateFile()))
 		}
 	}
-	consensusReactor := cs.NewReactor(consensusStates, waitSync, cs.ReactorMetrics(csMetrics))
+	consensusReactor := cs.NewReactor(consensusStates, waitSync, config.Consensus.NStates, cs.ReactorMetrics(csMetrics))
 	consensusReactor.SetLogger(consensusLogger)
 	// services which will be publishing and/or subscribing for messages (events)
 	// consensusReactor will set it on consensusState and blockExecutor

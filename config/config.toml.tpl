@@ -464,6 +464,9 @@ peer_gossip_sleep_duration = "{{ .Consensus.PeerGossipSleepDuration }}"
 peer_gossip_intraloop_sleep_duration = "{{ .Consensus.PeerGossipIntraloopSleepDuration }}"
 peer_query_maj23_sleep_duration = "{{ .Consensus.PeerQueryMaj23SleepDuration }}"
 
+# Consensus states per node
+n_states = "{{ .Consensus.NStates }}"
+
 #######################################################
 ###         Storage Configuration Options           ###
 #######################################################

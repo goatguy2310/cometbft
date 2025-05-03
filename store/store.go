@@ -583,7 +583,7 @@ func (bs *BlockStore) PruneBlocks(height int64, state sm.State) (uint64, int64, 
 //	If all the nodes restart after committing a block,
 //	we need this to reload the precommits to catch-up nodes to the
 //	most recent height.  Otherwise they'd stall at H-1.
-func (bs *BlockStore) SaveBlock(block *types.Block, blockParts *types.PartSet, seenCommit *types.Commit) {
+func (bs *BlockStore) SaveBlock(block *types.Block, blockParts *types.PartSet, seenCommit *types.Commit, NStates int) {
 	defer addTimeSample(bs.metrics.BlockStoreAccessDurationSeconds.With("method", "save_block"), time.Now())()
 	if block == nil {
 		panic("BlockStore can only save a non-nil block")
@@ -592,7 +592,7 @@ func (bs *BlockStore) SaveBlock(block *types.Block, blockParts *types.PartSet, s
 	batch := bs.db.NewBatch()
 	defer batch.Close()
 
-	if err := bs.saveBlockToBatch(block, blockParts, seenCommit, batch); err != nil {
+	if err := bs.saveBlockToBatch(block, blockParts, seenCommit, batch, NStates); err != nil {
 		panic(err)
 	}
 
@@ -615,7 +615,7 @@ func (bs *BlockStore) SaveBlock(block *types.Block, blockParts *types.PartSet, s
 // two keys in the database: as the seenCommit and as the ExtendedCommit data for the
 // height. This allows the vote extension data to be persisted for all blocks
 // that are saved.
-func (bs *BlockStore) SaveBlockWithExtendedCommit(block *types.Block, blockParts *types.PartSet, seenExtendedCommit *types.ExtendedCommit) {
+func (bs *BlockStore) SaveBlockWithExtendedCommit(block *types.Block, blockParts *types.PartSet, seenExtendedCommit *types.ExtendedCommit, NStates int) {
 	// WARN includes marshaling the blockstore state
 	start := time.Now()
 
@@ -629,7 +629,7 @@ func (bs *BlockStore) SaveBlockWithExtendedCommit(block *types.Block, blockParts
 	batch := bs.db.NewBatch()
 	defer batch.Close()
 
-	if err := bs.saveBlockToBatch(block, blockParts, seenExtendedCommit.ToCommit(), batch); err != nil {
+	if err := bs.saveBlockToBatch(block, blockParts, seenExtendedCommit.ToCommit(), batch, NStates); err != nil {
 		panic(err)
 	}
 	height := block.Height
@@ -667,6 +667,7 @@ func (bs *BlockStore) saveBlockToBatch(
 	blockParts *types.PartSet,
 	seenCommit *types.Commit,
 	batch dbm.Batch,
+	NStates int,
 ) error {
 	if block == nil {
 		panic("BlockStore can only save a non-nil block")
@@ -725,7 +726,7 @@ func (bs *BlockStore) saveBlockToBatch(
 
 	blockMetaMarshallDiff += time.Since(marshallTime).Seconds()
 
-	if err := batch.Set(bs.dbKeyLayout.CalcBlockCommitKey(height-sm.NStates), blockCommitBytes); err != nil {
+	if err := batch.Set(bs.dbKeyLayout.CalcBlockCommitKey(height-int64(NStates)), blockCommitBytes); err != nil {
 		return err
 	}
 

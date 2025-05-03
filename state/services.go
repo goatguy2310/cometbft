@@ -24,8 +24,8 @@ type BlockStore interface {
 	LoadBlockMeta(height int64) *types.BlockMeta
 	LoadBlock(height int64) (*types.Block, *types.BlockMeta)
 
-	SaveBlock(block *types.Block, blockParts *types.PartSet, seenCommit *types.Commit)
-	SaveBlockWithExtendedCommit(block *types.Block, blockParts *types.PartSet, seenCommit *types.ExtendedCommit)
+	SaveBlock(block *types.Block, blockParts *types.PartSet, seenCommit *types.Commit, NStates int)
+	SaveBlockWithExtendedCommit(block *types.Block, blockParts *types.PartSet, seenCommit *types.ExtendedCommit, NStates int)
 
 	PruneBlocks(height int64, state State) (uint64, int64, error)
 

@@ -244,6 +244,7 @@ func (state State) MakeBlock(
 	lastCommit *types.Commit,
 	evidence []types.Evidence,
 	proposerAddress []byte,
+	NStates int,
 ) *types.Block {
 	// Build base block with block data.
 	block := types.MakeBlock(height, txs, lastCommit, evidence)
@@ -253,7 +254,7 @@ func (state State) MakeBlock(
 	switch {
 	case state.ConsensusParams.Feature.PbtsEnabled(height):
 		timestamp = cmttime.Now()
-	case state.InitialHeight <= height && height < state.InitialHeight+NStates:
+	case state.InitialHeight <= height && height < state.InitialHeight+int64(NStates):
 		timestamp = state.LastBlockTime // genesis time
 	default:
 		timestamp = lastCommit.MedianTime(state.LastValidators)

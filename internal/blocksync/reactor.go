@@ -71,11 +71,13 @@ type Reactor struct {
 	switchToConsensusMs int
 
 	metrics *Metrics
+
+	NStates int
 }
 
 // NewReactor returns new reactor instance.
 func NewReactor(state sm.State, blockExec *sm.BlockExecutor, store *store.BlockStore,
-	blockSync bool, localAddr crypto.Address, metrics *Metrics, offlineStateSyncHeight int64,
+	blockSync bool, localAddr crypto.Address, metrics *Metrics, offlineStateSyncHeight int64, NStates int,
 ) *Reactor {
 	storeHeight := store.Height()
 	if storeHeight == 0 {
@@ -115,6 +117,7 @@ func NewReactor(state sm.State, blockExec *sm.BlockExecutor, store *store.BlockS
 		requestsCh:   requestsCh,
 		errorsCh:     errorsCh,
 		metrics:      metrics,
+		NStates:      NStates,
 	}
 	bcR.BaseReactor = *p2p.NewBaseReactor("Reactor", bcR)
 	return bcR
@@ -587,13 +590,13 @@ func (bcR *Reactor) processBlock(first, second *types.Block, firstParts *types.P
 
 	// TODO: batch saves so we dont persist to disk every block
 	if state.ConsensusParams.Feature.VoteExtensionsEnabled(first.Height) {
-		bcR.store.SaveBlockWithExtendedCommit(first, firstParts, extCommit)
+		bcR.store.SaveBlockWithExtendedCommit(first, firstParts, extCommit, bcR.NStates)
 	} else {
 		// We use LastCommit here instead of extCommit. extCommit is not
 		// guaranteed to be populated by the peer if extensions are not enabled.
 		// Currently, the peer should provide an extCommit even if the vote extension data are absent
 		// but this may change so using second.LastCommit is safer.
-		bcR.store.SaveBlock(first, firstParts, second.LastCommit)
+		bcR.store.SaveBlock(first, firstParts, second.LastCommit, bcR.NStates)
 	}
 
 	// TODO: same thing for app - but we would need a way to

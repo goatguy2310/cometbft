@@ -80,6 +80,12 @@ func AddNodeFlags(cmd *cobra.Command) {
 		"db_dir",
 		config.DBPath,
 		"database directory")
+
+	// epoch flag
+	cmd.Flags().Int(
+		"consensus.n_states",
+		config.Consensus.NStates,
+		"number of consensus states for each validator")
 }
 
 // NewRunNodeCmd returns the command that allows the CLI to start a node.

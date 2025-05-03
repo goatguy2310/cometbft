@@ -1186,6 +1186,9 @@ type ConsensusConfig struct {
 	PeerGossipIntraloopSleepDuration time.Duration `mapstructure:"peer_gossip_intraloop_sleep_duration"` // upper bound on randomly selected values
 
 	DoubleSignCheckHeight int64 `mapstructure:"double_sign_check_height"`
+
+	// number of consensus states of each node
+	NStates int `mapstructure:"n_states"`
 }
 
 // DefaultConsensusConfig returns a default configuration for the consensus service.
@@ -1203,6 +1206,7 @@ func DefaultConsensusConfig() *ConsensusConfig {
 		PeerQueryMaj23SleepDuration:      2000 * time.Millisecond,
 		PeerGossipIntraloopSleepDuration: 0 * time.Second,
 		DoubleSignCheckHeight:            int64(0),
+		NStates:                          4,
 	}
 }
 
@@ -1294,6 +1298,9 @@ func (cfg *ConsensusConfig) ValidateBasic() error {
 	}
 	if cfg.DoubleSignCheckHeight < 0 {
 		return cmterrors.ErrNegativeField{Field: "double_sign_check_height"}
+	}
+	if cfg.NStates <= 0 {
+		return cmterrors.ErrNegativeField{Field: "n_states"}
 	}
 	return nil
 }
